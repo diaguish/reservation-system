@@ -4,6 +4,8 @@ import com.reservation.factory.ReservationFactory;
 import com.reservation.manager.Reservation;
 import com.reservation.manager.ReservationManager;
 import com.reservation.model.Reservable;
+import com.reservation.model.impl.SportCourt;
+import com.reservation.model.impl.SportPricing;
 import com.reservation.observer.ConsoleDisplay;
 
 import java.time.LocalDateTime;
@@ -25,7 +27,9 @@ import java.util.stream.Collectors;
  * SOLID — DIP :
  *   Le menu dépend de ReservationFactory et ReservationManager
  *   (qui eux-mêmes dépendent d'abstractions). Le menu ne connaît
- *   jamais MeetingRoom ou ConferencePricing directement.
+ *   les classes concrètes qu'à un seul endroit : choisirRessource(),
+ *   et uniquement pour SportCourt qui est sa responsabilité directe.
+ *   Les cases 1, 2, 3 seront complétés lors de la merge avec le binôme A.
  *
  * Design Pattern — Observer :
  *   ConsoleDisplay est enregistré auprès du Manager au démarrage.
@@ -123,6 +127,7 @@ public class ConsoleMenu {
      *
      * Cas limites gérés :
      *   - Type de ressource invalide
+     *   - Ressource indisponible sur le créneau (IllegalStateException)
      *   - Date dans le passé (géré par la Factory)
      *   - Durée négative ou nulle (géré par la Factory)
      *   - Format de date incorrect (géré par lireDate())
@@ -137,11 +142,10 @@ public class ConsoleMenu {
         System.out.println("    1. Salle de réunion");
         System.out.println("    2. Salle de conférence");
         System.out.println("    3. Équipement");
-        int typeChoix = lireEntier("Votre choix : ", 1, 3);
+        System.out.println("    4. Terrain de sport");
+        int typeChoix = lireEntier("  Votre choix : ", 1, 4);
 
         // Récupération de la ressource selon le type choisi
-        // Note : cette méthode sera branchée sur les vraies classes
-        // du binôme A lors de l'intégration finale
         Reservable ressource = choisirRessource(typeChoix);
         if (ressource == null) {
             System.out.println("  [ERREUR] Aucune ressource disponible pour ce type.");
@@ -154,16 +158,18 @@ public class ConsoleMenu {
         // Saisie de la date de début
         LocalDateTime debut = lireDate("  Date de début (dd/MM/yyyy HH:mm) : ");
 
-        // Saisie de la durée
-        String uniteLabel = (typeChoix == 3) ? "jours" : "heures";
-        long duree = lireEntier(
-            "  Durée en " + uniteLabel + " : ", 1, 720);
+        // Terrain et équipement se réservent en jours, les salles en heures
+        String uniteLabel = (typeChoix == 3 || typeChoix == 4) ? "jours" : "heures";
+        long duree = lireEntier("  Durée en " + uniteLabel + " : ", 1, 720);
 
-        // Création via la Factory (qui valide et délègue au Manager)
+        // Création via la Factory (valide et délègue au Manager)
+        // Le Manager vérifie la disponibilité et bloque les créneaux
+        // L'affichage de confirmation est géré par ConsoleDisplay (Observer)
         try {
             factory.creer(ressource, debut, duree, entreprise);
-            // L'affichage de confirmation est géré par ConsoleDisplay (Observer)
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            // IllegalArgumentException : paramètres invalides (Factory)
+            // IllegalStateException    : créneau indisponible (Manager)
             System.out.println("  [ERREUR] " + e.getMessage());
         }
     }
@@ -171,25 +177,92 @@ public class ConsoleMenu {
     /**
      * Retourne une ressource Reservable selon le type choisi.
      *
-     * Note d'intégration :
-     *   Pour l'instant, cette méthode retourne null car les classes
-     *   du binôme A ne sont pas encore disponibles.
-     *   Lors de l'intégration, on remplacera chaque case par
-     *   l'instanciation réelle (ex: new MeetingRoom(...)).
+     * C'est le seul endroit du menu qui instancie des classes concrètes.
+     * Cases 1, 2, 3 : complétés après la merge avec le binôme A.
+     * Case 4 : SportCourt disponible dès maintenant.
      *
-     *   C'est le seul endroit du menu où on instanciera des classes
-     *   concrètes — ce qui respecte le principe Factory du cours.
+     * SOLID — DIP respecté :
+     *   La valeur de retour est toujours typée Reservable (abstraction).
+     *   Le reste du menu ne sait pas ce qu'il y a dedans.
      */
     private Reservable choisirRessource(int type) {
-        // TODO (intégration) : instancier les vraies classes du binôme A
-        // Exemple futur :
-        // case 1 -> { afficherSallesReunion(); return salleChoisie; }
-        // case 2 -> { afficherSallesConference(); return salleChoisie; }
-        // case 3 -> { afficherEquipements(); return equipementChoisi; }
+        switch (type) {
+            case 1 -> {
+                // TODO (merge binôme A) : instancier MeetingRoom
+                System.out.println("  [INFO] Intégration MeetingRoom en attente.");
+                return null;
+            }
+            case 2 -> {
+                // TODO (merge binôme A) : instancier ConferenceRoom
+                System.out.println("  [INFO] Intégration ConferenceRoom en attente.");
+                return null;
+            }
+            case 3 -> {
+                // TODO (merge binôme A) : instancier Equipment
+                System.out.println("  [INFO] Intégration Equipment en attente.");
+                return null;
+            }
+            case 4 -> {
+                return creerTerrain();
+            }
+            default -> {
+                return null;
+            }
+        }
+    }
 
-        System.out.println("  [INFO] Intégration binôme A en attente.");
-        System.out.println("         Les ressources seront disponibles après la merge.");
-        return null;
+    /**
+     * Guide la création d'un terrain de sport.
+     *
+     * Extrait dans sa propre méthode pour respecter SRP :
+     *   choisirRessource() reste lisible et chaque type
+     *   de ressource aura sa propre méthode de création.
+     *
+     * La météo est demandée ICI avant la création car elle influence
+     * directement le calcul du prix via SportPricing.setMauvaisTemps().
+     *
+     * @return le SportCourt configuré, ou null si saisie invalide
+     */
+    private Reservable creerTerrain() {
+        System.out.println("\n" + SEPARATEUR_LEGER);
+        System.out.println("  TERRAIN DE SPORT");
+        System.out.println(SEPARATEUR_LEGER);
+
+        // Identité du terrain
+        String idTerrain  = lireChaine("  ID du terrain (ex: SPORT-01) : ");
+        String nomTerrain = lireChaine("  Nom du terrain : ");
+
+        // Paramètres tarifaires
+        System.out.print("  Prix de base par jour (€) : ");
+        double baseSport = lireDouble(1.0, 10000.0);
+
+        System.out.print("  Réduction si mauvais temps (ex: 0.20 pour 20%) : ");
+        double reduction = lireDouble(0.0, 1.0);
+
+        // Condition météo — influence le prix calculé
+        System.out.print("  Mauvais temps prévu ? (pluie/neige) (o/n) : ");
+        boolean pluie = scanner.nextLine().trim().equalsIgnoreCase("o");
+
+        // Construction du terrain avec sa stratégie de prix
+        SportPricing sp      = new SportPricing(baseSport, reduction);
+        SportCourt   terrain = new SportCourt(idTerrain, nomTerrain, sp);
+        terrain.setMauvaisTemps(pluie);
+
+        // Récapitulatif avant confirmation
+        System.out.println(SEPARATEUR_LEGER);
+        System.out.printf("  Terrain   : %s (%s)%n", nomTerrain, idTerrain);
+        System.out.printf("  Base/jour : %.2f €%n", baseSport);
+        System.out.printf("  Réduction : %.0f%%%n", reduction * 100);
+        if (pluie) {
+            System.out.printf("  Prix effectif : %.2f €/jour (réduction appliquée)%n",
+                baseSport * (1 - reduction));
+        } else {
+            System.out.printf("  Prix effectif : %.2f €/jour (pas de réduction)%n",
+                baseSport);
+        }
+        System.out.println(SEPARATEUR_LEGER);
+
+        return terrain;
     }
 
     // =========================================================
@@ -200,25 +273,27 @@ public class ConsoleMenu {
      * Annule une réservation à partir de son ID.
      *
      * Cas limites gérés :
-     *   - ID vide ou null
-     *   - ID inexistant dans le système
+     *   - Liste vide → message et retour immédiat
+     *   - ID vide ou null → géré par lireChaine()
+     *   - ID inexistant → message clair
+     *   - Annulation refusée par l'utilisateur → abandon propre
      */
     private void annulerReservation() {
         System.out.println("\n" + SEPARATEUR);
         System.out.println("  ANNULER UNE RÉSERVATION");
         System.out.println(SEPARATEUR);
 
-        // On affiche d'abord la liste pour aider l'utilisateur
         if (manager.listerReservations().isEmpty()) {
             System.out.println("  Aucune réservation active.");
             return;
         }
 
+        // Affichage de la liste pour guider le choix
         afficherListeResumee();
 
         String id = lireChaine("  ID de la réservation à annuler : ");
 
-        // Confirmation avant annulation (cas limite UX)
+        // Confirmation avant action irréversible
         System.out.print("  Confirmer l'annulation de " + id + " ? (o/n) : ");
         String confirmation = scanner.nextLine().trim().toLowerCase();
 
@@ -231,7 +306,8 @@ public class ConsoleMenu {
         if (!succes) {
             System.out.println("  [ERREUR] Réservation introuvable : " + id);
         }
-        // Si succès, ConsoleDisplay (Observer) affiche la confirmation
+        // Si succès : ConsoleDisplay (Observer) affiche la confirmation
+        // et les créneaux sont libérés dans DisponibiliteManager
     }
 
     // =========================================================
@@ -239,9 +315,9 @@ public class ConsoleMenu {
     // =========================================================
 
     /**
-     * Affiche toutes les réservations avec leur détail complet.
-     * Se met à jour automatiquement (l'Observer a déjà notifié
-     * les changements en temps réel).
+     * Affiche toutes les réservations actives avec leur détail complet.
+     *
+     * Cas limite : liste vide → message clair.
      */
     private void listerToutesLesReservations() {
         System.out.println("\n" + SEPARATEUR);
@@ -250,7 +326,6 @@ public class ConsoleMenu {
 
         List<Reservation> liste = manager.listerReservations();
 
-        // Cas limite : liste vide
         if (liste.isEmpty()) {
             System.out.println("  Aucune réservation enregistrée.");
             return;
@@ -281,7 +356,7 @@ public class ConsoleMenu {
         Reservation r = manager.trouverParId(id);
 
         if (r == null) {
-            System.out.println("  [ERREUR] Aucune réservation trouvée pour l'ID : " + id);
+            System.out.println("  [ERREUR] Aucune réservation trouvée pour : " + id);
         } else {
             System.out.println("\n" + r.toString());
         }
@@ -292,7 +367,11 @@ public class ConsoleMenu {
     // =========================================================
 
     /**
-     * Affiche le détail complet d'une réservation choisie dans la liste.
+     * Affiche le détail complet d'une réservation sélectionnée.
+     *
+     * Cas limites :
+     *   - Liste vide → retour immédiat
+     *   - ID introuvable → message clair
      */
     private void afficherDetailReservation() {
         System.out.println("\n" + SEPARATEUR);
@@ -328,7 +407,7 @@ public class ConsoleMenu {
     /**
      * Filtre et affiche les réservations d'une entreprise donnée.
      *
-     * Cas limite : aucune réservation pour cette entreprise → message clair.
+     * Cas limite : aucun résultat → message clair.
      */
     private void listerParEntreprise() {
         System.out.println("\n" + SEPARATEUR);
@@ -337,14 +416,12 @@ public class ConsoleMenu {
 
         String entreprise = lireChaine("  Nom de l'entreprise : ");
 
-        // Filtrage via Stream (Java 17)
         List<Reservation> resultats = manager.listerReservations()
                 .stream()
                 .filter(r -> r.getEntreprise()
                         .equalsIgnoreCase(entreprise.trim()))
                 .collect(Collectors.toList());
 
-        // Cas limite : aucun résultat
         if (resultats.isEmpty()) {
             System.out.println("  Aucune réservation pour : " + entreprise);
             return;
@@ -364,8 +441,9 @@ public class ConsoleMenu {
     // =========================================================
 
     /**
-     * Demande confirmation avant de quitter.
-     * @return false si on quitte, true si on reste
+     * Demande confirmation avant de quitter proprement.
+     *
+     * @return false pour arrêter la boucle, true pour continuer
      */
     private boolean quitter() {
         System.out.print("\n  Voulez-vous vraiment quitter ? (o/n) : ");
@@ -373,9 +451,9 @@ public class ConsoleMenu {
         if (rep.equals("o")) {
             System.out.println("\n  Au revoir !\n");
             scanner.close();
-            return false; // arrête la boucle
+            return false;
         }
-        return true; // continue la boucle
+        return true;
     }
 
     // =========================================================
@@ -383,8 +461,8 @@ public class ConsoleMenu {
     // =========================================================
 
     /**
-     * Affiche la liste résumée des réservations (ID + nom ressource).
-     * Utilisé dans annuler et afficher détail pour guider l'utilisateur.
+     * Affiche la liste résumée : ID | nom ressource | entreprise.
+     * Utilisé avant annuler et afficher détail pour guider l'utilisateur.
      */
     private void afficherListeResumee() {
         System.out.println("  Réservations disponibles :");
@@ -398,8 +476,7 @@ public class ConsoleMenu {
     }
 
     /**
-     * Lit un entier dans un intervalle [min, max].
-     * Boucle jusqu'à obtenir une valeur valide.
+     * Lit un entier dans [min, max] avec boucle de validation.
      *
      * Cas limites gérés :
      *   - Saisie non numérique → redemande
@@ -421,7 +498,30 @@ public class ConsoleMenu {
     }
 
     /**
-     * Lit une chaîne non vide.
+     * Lit un double dans [min, max] avec boucle de validation.
+     * Utilisé pour les paramètres tarifaires du terrain de sport.
+     *
+     * Cas limites gérés :
+     *   - Saisie non numérique → redemande
+     *   - Valeur hors intervalle → redemande
+     */
+    private double lireDouble(double min, double max) {
+        while (true) {
+            String ligne = scanner.nextLine().trim();
+            try {
+                double valeur = Double.parseDouble(ligne);
+                if (valeur >= min && valeur <= max) return valeur;
+                System.out.printf("  [ERREUR] Entrez une valeur entre %.2f et %.2f : ",
+                    min, max);
+            } catch (NumberFormatException e) {
+                System.out.print("  [ERREUR] Saisie invalide, entrez un nombre : ");
+            }
+        }
+    }
+
+    /**
+     * Lit une chaîne non vide avec boucle de validation.
+     *
      * Cas limite : chaîne vide ou espaces uniquement → redemande.
      */
     private String lireChaine(String invite) {
@@ -434,9 +534,10 @@ public class ConsoleMenu {
     }
 
     /**
-     * Lit une date au format dd/MM/yyyy HH:mm.
+     * Lit une date au format dd/MM/yyyy HH:mm avec boucle de validation.
+     *
      * Cas limites gérés :
-     *   - Format incorrect → redemande avec message clair
+     *   - Format incorrect → redemande avec exemple
      *   - Date dans le passé → avertissement (bloqué ensuite par la Factory)
      */
     private LocalDateTime lireDate(String invite) {
@@ -445,7 +546,6 @@ public class ConsoleMenu {
             String saisie = scanner.nextLine().trim();
             try {
                 LocalDateTime dt = LocalDateTime.parse(saisie, FORMATTER_SAISIE);
-                // Avertissement si date passée (la Factory bloquera de toute façon)
                 if (dt.isBefore(LocalDateTime.now())) {
                     System.out.println("  [ATTENTION] La date est dans le passé.");
                 }
