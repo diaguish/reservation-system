@@ -1,5 +1,7 @@
 package com.reservation.model;
 
+import java.time.LocalDateTime;
+
 /**
  * Interface commune à tout objet réservable dans le système.
  *
@@ -19,23 +21,30 @@ package com.reservation.model;
  */
 public interface Reservable {
 
-    /** Identifiant unique de la ressource (ex: "SALLE-01") */
     String getId();
-
-    /** Nom lisible de la ressource (ex: "Salle Einstein") */
     String getNom();
-
-    /**
-     * Calcule le prix d'une réservation.
-     *
-     * @param duree durée en heures pour les salles, en jours pour les équipements
-     * @return le prix total en euros
-     */
+    String getDescription();
     double calculerPrix(long duree);
 
     /**
-     * Description courte affichée dans le menu console.
-     * Chaque type de ressource retourne une description adaptée.
+     * Vérifie si la ressource est disponible sur une plage donnée.
+     * Délègue à son DisponibiliteManager.
+     *
+     * @param debut date et heure de début souhaitées
+     * @param duree nombre d'heures demandées
+     * @return true si tous les créneaux sont libres
      */
-    String getDescription();
+    boolean estDisponible(LocalDateTime debut, long duree);
+
+    /**
+     * Expose le gestionnaire de disponibilité de cette ressource.
+     * Utilisé par ReservationManager pour bloquer/libérer les créneaux.
+     *
+     * SOLID — DIP :
+     *   ReservationManager n'accède jamais au DisponibiliteManager
+     *   directement depuis une classe concrète. Il passe par cette
+     *   méthode définie dans l'abstraction.
+     */
+    DisponibiliteManager getDisponibiliteManager();
+
 }

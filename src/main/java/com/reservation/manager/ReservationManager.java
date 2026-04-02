@@ -115,20 +115,29 @@ public class ReservationManager {
      * @return la réservation créée
      */
     public Reservation creerReservation(Reservable reservable,
-                                        LocalDateTime debut,
-                                        long duree,
-                                        String entreprise) {
-        // Génération d'un ID unique avec padding (ex: "RES-001")
-        String id = String.format("RES-%03d", compteurId++);
+                                    LocalDateTime debut,
+                                    long duree,
+                                    String entreprise) {
 
-        Reservation reservation = new Reservation(id, reservable, debut, duree, entreprise);
-        reservations.add(reservation);
-
-        // Notification de tous les observateurs (pattern Observer)
-        notifierCreation(reservation);
-
-        return reservation;
+    // NOUVEAU — vérification disponibilité avant toute création
+    if (!reservable.estDisponible(debut, duree)) {
+        throw new IllegalStateException(
+            "La ressource '" + reservable.getNom() +
+            "' n'est pas disponible sur ce créneau " +
+            "(début: " + debut + ", durée: " + duree + "h)."
+        );
     }
+
+    String id = String.format("RES-%03d", compteurId++);
+    Reservation reservation = new Reservation(id, reservable, debut, duree, entreprise);
+    reservations.add(reservation);
+
+    // NOUVEAU — bloquer les créneaux après création confirmée
+    reservable.getDisponibiliteManager().bloquerCreneaux(debut, duree);
+
+    notifierCreation(reservation);
+    return reservation;
+}
 
     /**
      * Annule une réservation existante par son ID.
@@ -137,19 +146,23 @@ public class ReservationManager {
      * @return true si trouvée et annulée, false sinon
      */
     public boolean annulerReservation(String id) {
-        // Cas limite : ID null ou vide
-        if (id == null || id.isBlank()) return false;
+    if (id == null || id.isBlank()) return false;
 
-        for (Reservation r : reservations) {
-            if (r.getId().equals(id)) {
-                reservations.remove(r);
-                notifierAnnulation(r);
-                return true;
-            }
+    for (Reservation r : reservations) {
+        if (r.getId().equals(id)) {
+            reservations.remove(r);
+
+            // NOUVEAU — libérer les créneaux à l'annulation
+            r.getReservable()
+            .getDisponibiliteManager()
+            .libererCreneaux(r.getDebut(), r.getDuree());
+
+            notifierAnnulation(r);
+            return true;
         }
-        // Cas limite : réservation introuvable
-        return false;
     }
+    return false;
+}
 
     /**
      * Retourne une vue non-modifiable de toutes les réservations.
