@@ -1,4 +1,7 @@
-package com.reservation.model;
+package com.reservation.model.impl;
+
+import com.reservation.model.PricingStrategy;
+import com.reservation.model.Reservable;
 
 public class MeetingPricing implements PricingStrategy {
      @Override

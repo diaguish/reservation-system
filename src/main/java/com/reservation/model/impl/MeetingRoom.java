@@ -1,6 +1,10 @@
-package com.reservation.model;
+package com.reservation.model.impl;
 
 import java.time.LocalDateTime;
+
+import com.reservation.model.DisponibiliteManager;
+import com.reservation.model.PricingStrategy;
+import com.reservation.model.Reservable;
 
 public class MeetingRoom implements Reservable {
 

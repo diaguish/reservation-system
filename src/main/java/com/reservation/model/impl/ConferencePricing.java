@@ -1,4 +1,9 @@
-package com.reservation.model;
+package com.reservation.model.impl;
+
+import com.reservation.model.PricingStrategy;
+import com.reservation.model.Reservable;
+
+//import com.reservation.model.impl.ConferenceRoom;
 
 public class ConferencePricing implements PricingStrategy {
 
