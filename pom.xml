@@ -8,18 +8,14 @@
     <version>1.0-SNAPSHOT</version>
 
     <properties>
-        <!-- Version Java -->
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-
-        <!-- Versions des dépendances -->
         <junit.jupiter.version>5.10.0</junit.jupiter.version>
         <maven-surefire-plugin.version>3.1.2</maven-surefire-plugin.version>
     </properties>
 
     <dependencies>
-        <!-- JUnit 5 : framework de tests unitaires (cours 1) -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
@@ -30,11 +26,23 @@
 
     <build>
         <plugins>
-            <!-- Plugin Maven pour exécuter les tests JUnit 5 -->
+
+            <!-- Plugin pour exécuter les tests JUnit 5 -->
             <plugin>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>${maven-surefire-plugin.version}</version>
             </plugin>
+
+            <!-- Plugin pour lancer l'application via mvn exec:java -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.1.0</version>
+                <configuration>
+                    <mainClass>com.reservation.Main</mainClass>
+                </configuration>
+            </plugin>
+
         </plugins>
     </build>
 
