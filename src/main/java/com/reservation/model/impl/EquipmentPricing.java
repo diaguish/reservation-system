@@ -7,6 +7,9 @@ public class EquipmentPricing implements PricingStrategy {
 
     @Override
     public double calculerPrix(Reservable reservable, long duree) {
+        if (duree <= 0) {
+            throw new IllegalArgumentException("La durée doit être positive");
+        }
         if (!(reservable instanceof Equipment)) {
             throw new IllegalArgumentException(
                 "EquipmentPricing attend un Equipment");
