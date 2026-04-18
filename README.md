@@ -1,93 +1,185 @@
-# ReserveND
+# Système de Réservation de Salles
 
+Projet Java réalisé dans le cadre du cours **INF3133 — Outils pour le développement logiciel**  
+ESIEA 3A — Semestre 6 — 2025-2026
 
+---
 
-## Getting started
+## Présentation
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+Application console de gestion de réservations de salles et équipements  
+pour plusieurs entreprises. Le système permet de réserver quatre types  
+de ressources, de gérer les disponibilités par créneaux horaires,  
+et d'annuler des réservations avec libération automatique des créneaux.
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+---
 
-## Add your files
+## Fonctionnalités
 
-- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-- [ ] [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
+- Créer une réservation (salle de réunion, conférence, équipement, terrain de sport)
+- Annuler une réservation avec libération automatique des créneaux
+- Lister toutes les réservations actives
+- Rechercher une réservation par ID
+- Afficher le détail complet d'une réservation
+- Filtrer les réservations par entreprise
+- Vérification de disponibilité par créneaux horaires (gestion multi-jours et débordement minuit)
 
+---
+
+## Types de ressources
+
+| Type | Unité | Formule de prix |
+|---|---|---|
+| Salle de réunion | Heure | `(baseReunion + capacite × facteur) × duree` |
+| Salle de conférence | Heure | `baseConference + max(0, duree - dureeFixe) × extraParHeure` |
+| Équipement | Jour | `tauxJournalier × jours (+ penalite si retard)` |
+| Terrain de sport | Jour | `baseSport × (1 - reductionPluie) × jours` |
+
+---
+
+## Architecture
+
+src/
+├── main/java/com/reservation/
+│   ├── Main.java
+│   ├── model/
+│   │   ├── Reservable.java            ← interface
+│   │   ├── PricingStrategy.java       ← interface (Strategy)
+│   │   └── DisponibiliteManager.java  ← gestion créneaux horaires
+│   ├── model/impl/
+│   │   ├── MeetingRoom.java
+│   │   ├── ConferenceRoom.java
+│   │   ├── Equipment.java
+│   │   ├── SportCourt.java
+│   │   ├── MeetingPricing.java
+│   │   ├── ConferencePricing.java
+│   │   ├── EquipmentPricing.java
+│   │   └── SportPricing.java
+│   ├── manager/
+│   │   ├── Reservation.java
+│   │   └── ReservationManager.java    ← Singleton + Observable
+│   ├── factory/
+│   │   └── ReservationFactory.java    ← Factory Method
+│   ├── observer/
+│   │   ├── ReservationObserver.java   ← interface Observer
+│   │   └── ConsoleDisplay.java
+│   └── ui/
+│       └── ConsoleMenu.java
+└── test/java/com/reservation/
+└── model/impl/
+├── MeetingPricingTest.java
+├── ConferencePricingTest.java
+├── EquipmentPricingTest.java
+└── DisponibiliteManagerTest.java
+
+---
+
+## Design Patterns appliqués
+
+### Strategy
+Chaque formule de calcul de prix est encapsulée dans une classe distincte  
+qui implémente `PricingStrategy`. Ajouter un nouveau type de tarification  
+ne nécessite aucune modification des classes existantes.
+
+### Singleton
+`ReservationManager` est instancié une seule fois via `getInstance()`.  
+Toutes les réservations transitent par ce point d'accès unique,  
+garantissant la cohérence des données.
+
+### Factory Method
+`ReservationFactory` centralise la création et la validation des réservations.  
+Le `ConsoleMenu` délègue entièrement la construction à la Factory.
+
+### Observer
+`ReservationManager` notifie automatiquement ses observateurs à chaque  
+création ou annulation. `ConsoleDisplay` implémente `ReservationObserver`  
+et affiche les confirmations sans que le menu le demande.
+
+---
+
+## Principes SOLID
+
+| Principe | Application |
+|---|---|
+| SRP | Chaque classe a une responsabilité unique : `Reservation` porte les données, `ConsoleDisplay` affiche, `ReservationManager` orchestre |
+| OCP | Nouveau type de ressource ou de tarification = nouvelle classe, zéro modification de l'existant |
+| LSP | Tout `Reservable` est substituable : `ReservationManager` accepte `MeetingRoom`, `SportCourt` etc. sans vérification de type |
+| ISP | `Reservable` n'expose que les méthodes communes. Les attributs spécifiques (capacité, pénalité...) restent dans les classes concrètes |
+| DIP | `ReservationManager` dépend de `Reservable` et `ReservationObserver` (abstractions), jamais des classes concrètes |
+
+---
+
+## Gestion du temps et des disponibilités
+
+Chaque ressource porte son propre `DisponibiliteManager` contenant  
+une `Map<LocalDate, boolean[]>` : pour chaque jour, un tableau de 24 booléens  
+représentant les créneaux horaires (index = heure, `true` = libre).
+
+- **Réservation** : bloque les créneaux via `bloquerCreneaux()`
+- **Annulation** : libère les créneaux via `libererCreneaux()`
+- **Multi-jours** : le curseur `LocalDateTime` avance heure par heure avec `plusHours(1)`, Java gère le changement de jour automatiquement
+- **Débordement minuit** : une réservation à 23h pour 2h crée des entrées sur deux jours distincts dans la Map
+
+---
+
+## Prérequis
+
+- Java 17+
+- Maven 3.6+
+
+---
+
+## Lancement
+
+```bash
+# Compiler et lancer
+mvn compile exec:java -Dexec.mainClass="com.reservation.Main"
+
+# Lancer les tests unitaires
+mvn test
 ```
-cd existing_repo
-git remote add origin https://gitlab.esiea.fr/diago.tall/reservend.git
-git branch -M main
-git push -uf origin main
+
+---
+
+## Tests
+
+23 tests unitaires couvrant :
+
+- Calculs de prix pour chaque stratégie (cas nominal, cas limites, erreurs)
+- Gestion des disponibilités (`DisponibiliteManager`) : créneaux libres, bloquer, libérer, débordement minuit
+- Cas limites : durée nulle, durée négative, réduction invalide, base négative
+
+```bash
+mvn test
 ```
 
-## Integrate with your tools
+Résultat attendu : `Tests run: 23, Failures: 0, Errors: 0, Skipped: 0`
 
-- [ ] [Set up project integrations](https://gitlab.esiea.fr/diago.tall/reservend/-/settings/integrations)
+---
 
-## Collaborate with your team
+## Workflow GitLab
 
-- [ ] [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-- [ ] [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-- [ ] [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-- [ ] [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-- [ ] [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
+| Branche | Contenu |
+|---|---|
+| `main` | Code stable et intégré |
+| `feature/core-model` | Modèles et stratégies de prix (Binôme A) |
+| `feature/manager-ui` | Manager, Factory, Observer, UI (Binôme B) |
+| `feature/sport-court-integration` | Ajout du terrain de sport |
+| `feature/launch-config` | Configuration Maven exec plugin |
+| `test-unitaires` | Tests unitaires JUnit 5 |
 
-## Test and Deploy
+---
 
-Use the built-in continuous integration in GitLab.
+## Auteurs
+| [Mohamed Naby Ndaw] |Manager, Factory, Observer, UI, SportCourt |
+| [Diago Alioune Tall] | Binôme A — Modèles, Stratégies de prix, Tests |
 
-- [ ] [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/)
-- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-- [ ] [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-- [ ] [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-- [ ] [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
+---
 
-***
+## Structure du projet Maven
 
-# Editing this README
-
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
-
-## Suggestions for a good README
-
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
-
-## Name
-Choose a self-explaining name for your project.
-
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
-
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
-
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
-
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
-
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
-
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
-
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
-
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
-
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
-
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
-
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
-
-## License
-For open source projects, say how it is licensed.
-
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+```xml
+<groupId>com.reservation</groupId>
+<artifactId>reservation-system</artifactId>
+<version>1.0-SNAPSHOT</version>
+```
