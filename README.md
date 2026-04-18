@@ -1,12 +1,5 @@
 # Système de Réservation de Salles
 
-Projet Java réalisé dans le cadre du cours **INF3133 — Outils pour le développement logiciel**  
-ESIEA 3A — Semestre 6 — 2025-2026
-
----
-
-## Présentation
-
 Application console de gestion de réservations de salles et équipements  
 pour plusieurs entreprises. Le système permet de réserver quatre types  
 de ressources, de gérer les disponibilités par créneaux horaires,  
